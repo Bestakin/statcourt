@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #0F1B2D;
+  color: #F2F5F8;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* visible keyboard focus, kept even with custom styling */
+:focus-visible {
+  outline: 2px solid #FF7A1A;
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.35s ease-out;
+}
