@@ -80,17 +80,17 @@ API docs (interactive, via FastAPI's auto-generated Swagger UI): `http://localho
 ---
 
 ## Project structure
-statcourt/
-├── main.py # FastAPI backend — all API endpoints
-├── wnba.db # SQLite database (players + season stats)
-├── requirements.txt
-└── frontend/
-├── src/
-│ ├── App.jsx # Main app logic and layout
-│ ├── api.js # API client
-│ ├── recentSearches.js # LocalStorage-backed recent searches
-│ └── components/ # UI components (charts, panels, search, etc.)
-└── package.json
+
+- `main.py` — FastAPI backend, all API endpoints
+- `wnba.db` — SQLite database (players + season stats)
+- `requirements.txt`
+- `frontend/`
+  - `src/App.jsx` — main app logic and layout
+  - `src/api.js` — API client
+  - `src/recentSearches.js` — localStorage-backed recent searches
+  - `src/components/` — UI components (charts, panels, search, etc.)
+  - `package.json`
+
 ---
 
 ## Roadmap
