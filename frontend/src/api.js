@@ -2,7 +2,7 @@
 // during normal dev, or your PC's LAN IP when testing from a phone/tablet
 // on the same network) rather than hardcoding 'localhost', which only
 // resolves correctly on the same machine running the dev server.
-const BASE_URL = `http://${window.location.hostname}:8005`
+const BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8005`
 
 async function request(path) {
   const res = await fetch(`${BASE_URL}${path}`)
