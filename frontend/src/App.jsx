@@ -341,8 +341,8 @@ export default function App() {
                 />
               </div>
             ) : (
-              <p className="text-center text-ink-faint font-body py-6 text-sm">
-                Pick a season where both players were active to see stat comparisons.
+              <p className="text-ink-faint font-body text-sm mb-3">
+                 A season comparison isn't available because one or both players weren't active during the selected season. Switch to Career to compare their full careers.s.
               </p>
             )}
 
