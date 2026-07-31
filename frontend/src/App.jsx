@@ -342,7 +342,7 @@ export default function App() {
               </div>
             ) : (
               <p className="text-ink-faint font-body text-sm mb-3">
-                 A season comparison isn't available because one or both players weren't active during the selected season. Switch to Career to compare their full careers.s.
+                 A season comparison isn't available because one or both players weren't active during the selected season. Switch to Career to compare their full careers.
               </p>
             )}
 
