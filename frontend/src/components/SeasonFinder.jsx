@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import Avatar from './Avatar'
 import { findSeasons } from '../api'
 import { addRecentSearch } from '../recentSearches'
@@ -20,7 +20,7 @@ function buildApiFilters(v) {
   }
 }
 
-function buildLabel(v) {
+function buildLabel(v, league) {
   const parts = []
   if (v.minPts) parts.push(`PPG > ${v.minPts}`)
   if (v.minReb) parts.push(`RPG > ${v.minReb}`)
@@ -32,10 +32,11 @@ function buildLabel(v) {
   if (v.team) parts.push(`Team: ${v.team.toUpperCase()}`)
   if (v.seasonYear) parts.push(`Season ${v.seasonYear}`)
   if (v.draftYear) parts.push(`Drafted ${v.draftYear}`)
-  return parts.length > 0 ? `Seasons: ${parts.join(', ')}` : 'All seasons'
+  const filterText = parts.length > 0 ? parts.join(', ') : 'All seasons'
+  return `${league} Seasons: ${filterText}`
 }
 
-export default function SeasonFinder({ onCompare, onClose, initialFilters, onSearched }) {
+export default function SeasonFinder({ league = 'WNBA', onCompare, onClose, initialFilters, onSearched }) {
   const [minPts, setMinPts] = useState(initialFilters?.minPts ?? '25')
   const [advancedOpen, setAdvancedOpen] = useState(!!initialFilters?.advancedOpen)
 
@@ -53,19 +54,25 @@ export default function SeasonFinder({ onCompare, onClose, initialFilters, onSea
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  // If the league changes while this panel is open, clear stale results
+  // from the previous league rather than leaving mismatched data on screen.
+  useEffect(() => {
+    setResults(null)
+  }, [league])
+
   const runSearch = async (rawValues) => {
     setLoading(true)
     setError(null)
     try {
-      const data = await findSeasons(buildApiFilters(rawValues))
+      const data = await findSeasons(buildApiFilters(rawValues), league)
       setResults(data.results)
 
-      const label = buildLabel(rawValues)
+      const label = buildLabel(rawValues, league)
       addRecentSearch({
-        id: `finder-${JSON.stringify(rawValues)}`,
+        id: `finder-${league}-${JSON.stringify(rawValues)}`,
         type: 'finder',
         label,
-        state: rawValues,
+        state: { ...rawValues, league },
       })
       onSearched && onSearched()
     } catch (err) {
@@ -94,7 +101,7 @@ export default function SeasonFinder({ onCompare, onClose, initialFilters, onSea
     <div>
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs uppercase tracking-widest text-ink-muted font-body">
-          Season Finder
+          {league} Season Finder
         </span>
         <button
           onClick={onClose}

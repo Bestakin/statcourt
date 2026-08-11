@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Avatar from './Avatar'
 import { getDraftClass } from '../api'
 
-export default function DraftClassExplorer({ year, onSelectPlayer, onClose }) {
+export default function DraftClassExplorer({ year, league = 'WNBA', onSelectPlayer, onClose }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
@@ -10,10 +10,10 @@ export default function DraftClassExplorer({ year, onSelectPlayer, onClose }) {
     if (!year) return
     setData(null)
     setError(null)
-    getDraftClass(year)
+    getDraftClass(year, league)
       .then(setData)
       .catch((err) => setError(err.message))
-  }, [year])
+  }, [year, league])
 
   if (!year) return null
 
@@ -33,7 +33,6 @@ export default function DraftClassExplorer({ year, onSelectPlayer, onClose }) {
       <p className="text-[10px] text-ink-faint font-body italic mb-3">
         Ordered by career games played, we don't have actual draft pick order, this isn't it.
       </p>
-
       {error ? (
         <p className="text-sm text-red-400 font-body">{error}</p>
       ) : !data ? (

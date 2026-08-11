@@ -1,8 +1,8 @@
 """
-main.py — WNBA Stats Compare API
+main.py — StatCourt API (multi-league: WNBA + NBA)
 
-Reads only from local SQLite (wnba.db). Never calls stats.nba.com live.
-Run seed_data.py first to populate the DB.
+Reads only from local SQLite (wnba.db). Never calls basketball-reference
+live. Run the appropriate seed script(s) to populate the DB.
 """
 
 import sqlite3
@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="WNBA Stats Compare API")
+app = FastAPI(title="StatCourt API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +23,9 @@ app.add_middleware(
 )
 
 DB_PATH = "wnba.db"
+
+VALID_LEAGUES = ["WNBA", "NBA"]
+LEAGUE_PATTERN = "^(WNBA|NBA)$"
 
 
 def get_conn():
@@ -36,6 +39,7 @@ def get_conn():
 class PlayerSummary(BaseModel):
     id: int
     name: str
+    league: str
     draft_year: Optional[int]
     last_active_year: Optional[int]
     position: Optional[str]
@@ -63,8 +67,8 @@ class SeasonStats(BaseModel):
 
 
 class BestSeasonHighlight(BaseModel):
-    stat: str            # "pts" | "reb" | "ast" | "win_shares"
-    label: str            # friendly label, e.g. "Best Scoring Season"
+    stat: str
+    label: str
     season_year: int
     value: float
 
@@ -89,20 +93,20 @@ class StatRank(BaseModel):
     season_year: int
     stat: str
     value: Optional[float]
-    rank: Optional[int]     # 1 = best
-    pool_size: int          # how many qualifying players that season
+    rank: Optional[int]
+    pool_size: int
 
 
 class PlayerYearComparison(BaseModel):
     player: PlayerSummary
     season_year: int
-    status: str            # "active" | "not_yet_drafted" | "retired" | "no_data"
+    status: str
     stats: Optional[SeasonStats] = None
 
 
 class CategoryScore(BaseModel):
     category: str
-    player_1_score: float   # 0-100, share of the combined total for this category
+    player_1_score: float
     player_2_score: float
 
 
@@ -110,12 +114,12 @@ class CompositeComparison(BaseModel):
     categories: list[CategoryScore]
     overall_player_1: float
     overall_player_2: float
-    winner: Optional[int]   # 1 or 2, or None if tied
+    winner: Optional[int]
 
 
 class SimilarPlayer(BaseModel):
     player: PlayerSummary
-    similarity_pct: float   # 0-100, higher = more similar
+    similarity_pct: float
     ppg: Optional[float]
     rpg: Optional[float]
     apg: Optional[float]
@@ -124,7 +128,7 @@ class SimilarPlayer(BaseModel):
 class SimilarPlayersResponse(BaseModel):
     target_player_id: int
     min_career_games: int
-    pool_size: int          # how many players were eligible for comparison
+    pool_size: int
     results: list[SimilarPlayer]
 
 
@@ -136,6 +140,14 @@ class CompareResponse(BaseModel):
 
 
 # ---------- Helpers ----------
+
+def _player_summary(p: sqlite3.Row) -> PlayerSummary:
+    return PlayerSummary(
+        id=p["id"], name=p["name"], league=p["league"],
+        draft_year=p["draft_year"], last_active_year=p["last_active_year"],
+        position=p["position"], team_abbreviation=p["team_abbreviation"],
+    )
+
 
 def fetch_player(conn, player_id: int) -> sqlite3.Row:
     row = conn.execute(
@@ -156,11 +168,7 @@ def fetch_season_stats(conn, player_id: int, season_year: int) -> Optional[sqlit
 
 def build_year_comparison(conn, player_id: int, season_year: int) -> PlayerYearComparison:
     p = fetch_player(conn, player_id)
-    player_summary = PlayerSummary(
-        id=p["id"], name=p["name"], draft_year=p["draft_year"],
-        last_active_year=p["last_active_year"],
-        position=p["position"], team_abbreviation=p["team_abbreviation"],
-    )
+    player_summary = _player_summary(p)
 
     draft_year = p["draft_year"]
     last_active_year = p["last_active_year"]
@@ -168,9 +176,6 @@ def build_year_comparison(conn, player_id: int, season_year: int) -> PlayerYearC
     if draft_year is not None and season_year < draft_year:
         status = "not_yet_drafted"
     elif last_active_year is not None and season_year > last_active_year:
-        # Note: this means "no stats past this point in our scraped data,"
-        # which is a good proxy for retired but isn't a certainty — a player
-        # could have simply missed the most recent scraped season to injury.
         status = "retired"
     else:
         status = "active"
@@ -189,8 +194,6 @@ def build_year_comparison(conn, player_id: int, season_year: int) -> PlayerYearC
                 win_shares=s["win_shares"],
             )
         else:
-            # In range, but no row for this specific season (e.g. sat out
-            # with injury). Distinct from not-yet-drafted or retired.
             status = "no_data"
 
     return PlayerYearComparison(
@@ -200,9 +203,6 @@ def build_year_comparison(conn, player_id: int, season_year: int) -> PlayerYearC
 
 
 def _share(a: Optional[float], b: Optional[float]) -> Optional[tuple]:
-    """Returns (a's % share, b's % share) of a+b, scale-invariant so pts (~20)
-    and pct stats (~0.5) can be averaged together fairly within a category.
-    Returns None if either value is missing or both are zero."""
     if a is None or b is None:
         return None
     total = a + b
@@ -212,13 +212,6 @@ def _share(a: Optional[float], b: Optional[float]) -> Optional[tuple]:
 
 
 def compute_composite(s1: SeasonStats, s2: SeasonStats) -> CompositeComparison:
-    """
-    Builds a transparent, explainable 'who had the better season' score.
-    This is an original analytical formula, not an official metric —
-    say so in the UI. Each category score is the mean of per-stat shares
-    (scale-invariant), so raw counting stats and percentage stats can mix
-    within a category without one dominating.
-    """
     categories_def = {
         "Offense": [("pts", s1.pts, s2.pts), ("ast", s1.ast, s2.ast), ("ts_pct", s1.ts_pct, s2.ts_pct)],
         "Defense": [("reb", s1.reb, s2.reb), ("stl", s1.stl, s2.stl), ("blk", s1.blk, s2.blk)],
@@ -254,23 +247,32 @@ def compute_composite(s1: SeasonStats, s2: SeasonStats) -> CompositeComparison:
 
 # ---------- Routes ----------
 
+@app.get("/leagues", response_model=list[str])
+def list_leagues():
+    """Which leagues have data. Frontend uses this to render the league toggle."""
+    conn = get_conn()
+    rows = conn.execute("SELECT DISTINCT league FROM players ORDER BY league").fetchall()
+    conn.close()
+    return [r["league"] for r in rows]
+
+
 @app.get("/players", response_model=list[PlayerSummary])
-def list_players(search: Optional[str] = Query(None, min_length=1)):
+def list_players(
+    search: Optional[str] = Query(None, min_length=1),
+    league: str = Query("WNBA", pattern=LEAGUE_PATTERN),
+):
     conn = get_conn()
     if search:
         rows = conn.execute(
-            "SELECT * FROM players WHERE name LIKE ? ORDER BY name",
-            (f"%{search}%",),
+            "SELECT * FROM players WHERE league = ? AND name LIKE ? ORDER BY name",
+            (league, f"%{search}%"),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM players ORDER BY name").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM players WHERE league = ? ORDER BY name", (league,)
+        ).fetchall()
     conn.close()
-    return [
-        PlayerSummary(id=r["id"], name=r["name"], draft_year=r["draft_year"],
-                       last_active_year=r["last_active_year"],
-                       position=r["position"], team_abbreviation=r["team_abbreviation"])
-        for r in rows
-    ]
+    return [_player_summary(r) for r in rows]
 
 
 @app.get("/players/{player_id}", response_model=PlayerSummary)
@@ -278,15 +280,13 @@ def get_player(player_id: int):
     conn = get_conn()
     p = fetch_player(conn, player_id)
     conn.close()
-    return PlayerSummary(id=p["id"], name=p["name"], draft_year=p["draft_year"],
-                          last_active_year=p["last_active_year"],
-                          position=p["position"], team_abbreviation=p["team_abbreviation"])
+    return _player_summary(p)
 
 
 @app.get("/players/{player_id}/stats", response_model=list[SeasonStats])
 def player_career_stats(player_id: int):
     conn = get_conn()
-    fetch_player(conn, player_id)  # 404s if missing
+    fetch_player(conn, player_id)
     rows = conn.execute(
         """SELECT * FROM player_season_stats
            WHERE player_id = ? ORDER BY season_year""",
@@ -311,17 +311,19 @@ def player_career_stats(player_id: int):
 def compare_players(
     player_1_id: int = Query(..., alias="p1"),
     player_2_id: int = Query(..., alias="p2"),
-    season_year: int = Query(..., alias="year", ge=1997, le=2100),
+    # Range widened from WNBA-only (1997+) to cover NBA's much longer
+    # history too. Actual validity is enforced by whether data exists for
+    # that player/year, not by this bound - this just blocks absurd input.
+    season_year: int = Query(..., alias="year", ge=1900, le=2100),
 ):
     """
-    Compare two players for a single season. `status` on each side is one of:
-      - "active": player was in the league, stats included
-      - "not_yet_drafted": season is before their draft year -> stats null
-      - "retired": season is after their last known active year -> stats null
-      - "no_data": in their active range but no stats row that year
-        (e.g. missed the season with injury) -> stats null
-    Frontend should map each status to friendly copy rather than treating
-    every null-stats case as the same thing.
+    Compare two players for a single season. Note: p1/p2 can technically
+    belong to different leagues - nothing here blocks that. The frontend
+    is expected to scope player search to one league at a time, so a
+    cross-league comparison shouldn't normally happen, but the API itself
+    doesn't enforce it (the composite/share-based scoring is mechanically
+    league-agnostic, even though comparing across eras/leagues isn't
+    analytically meaningful).
     """
     conn = get_conn()
     p1 = build_year_comparison(conn, player_1_id, season_year)
@@ -372,9 +374,7 @@ def player_career_averages(player_id: int):
     ] if h is not None]
 
     return CareerAverages(
-        player=PlayerSummary(id=p["id"], name=p["name"], draft_year=p["draft_year"],
-                              last_active_year=p["last_active_year"],
-                              position=p["position"], team_abbreviation=p["team_abbreviation"]),
+        player=_player_summary(p),
         seasons_played=len(rows),
         games_played=total_gp,
         ppg=weighted_avg("pts"), rpg=weighted_avg("reb"), apg=weighted_avg("ast"),
@@ -387,21 +387,23 @@ def player_career_averages(player_id: int):
 @app.get("/rank", response_model=StatRank)
 def stat_rank(
     player_id: int = Query(...),
-    season_year: int = Query(..., ge=1997, le=2100),
+    season_year: int = Query(..., ge=1900, le=2100),
     stat: str = Query(..., pattern="^(pts|reb|ast|stl|blk|win_shares|per|ts_pct)$"),
-    min_games: int = Query(10, ge=0, description="Minimum games played to qualify for ranking"),
+    min_games: int = Query(10, ge=0),
+    league: str = Query("WNBA", pattern=LEAGUE_PATTERN),
 ):
     """
-    Rank a player against everyone else who played that season for a given
-    stat. min_games filters out small-sample noise (e.g. a 2-game callup
-    with a gaudy per-game average).
+    Rank a player against everyone else IN THE SAME LEAGUE who played that
+    season. Without the league filter here, a season_year like 2024 would
+    pool NBA and WNBA players together, which is meaningless.
     """
     conn = get_conn()
     rows = conn.execute(
-        f"""SELECT player_id, {stat} as value FROM player_season_stats
-            WHERE season_year = ? AND games_played >= ? AND {stat} IS NOT NULL
+        f"""SELECT s.player_id, s.{stat} as value
+            FROM player_season_stats s JOIN players p ON p.id = s.player_id
+            WHERE p.league = ? AND s.season_year = ? AND s.games_played >= ? AND s.{stat} IS NOT NULL
             ORDER BY value DESC""",
-        (season_year, min_games),
+        (league, season_year, min_games),
     ).fetchall()
     conn.close()
 
@@ -424,21 +426,24 @@ SIMILARITY_FEATURES = ["pts", "reb", "ast", "stl", "blk", "fg_pct", "ft_pct",
                         "per", "ts_pct", "usg_pct", "win_shares"]
 
 
-def _build_feature_vectors(conn, min_games: int) -> dict:
+def _build_feature_vectors(conn, min_games: int, league: str) -> dict:
     """
-    Builds one career-average feature vector per eligible player, using the
-    same games-played-weighted averaging as the /career endpoint. Returns
-    {player_id: {feature: value}}. Players below min_games are excluded
-    entirely so a 3-game callup doesn't distort anyone's neighborhood.
+    Builds one career-average feature vector per eligible player WITHIN
+    THE GIVEN LEAGUE ONLY. This is the critical fix for multi-league
+    support: without the league filter, an NBA player could get compared
+    against WNBA players and vice versa, which produces a "similarity"
+    score that doesn't mean anything given how different the two leagues
+    are physically and statistically.
     """
     rows = conn.execute(
-        """SELECT player_id, games_played, pts, reb, ast, stl, blk,
-                  fg_pct, ft_pct, per, ts_pct, usg_pct, win_shares
-           FROM player_season_stats
-           WHERE games_played IS NOT NULL AND games_played > 0"""
+        """SELECT s.player_id, s.games_played, s.pts, s.reb, s.ast, s.stl, s.blk,
+                  s.fg_pct, s.ft_pct, s.per, s.ts_pct, s.usg_pct, s.win_shares
+           FROM player_season_stats s JOIN players p ON p.id = s.player_id
+           WHERE p.league = ? AND s.games_played IS NOT NULL AND s.games_played > 0""",
+        (league,),
     ).fetchall()
 
-    totals = {}  # player_id -> {feature: weighted_sum, "gp": total_gp}
+    totals = {}
     for r in rows:
         pid = r["player_id"]
         gp = r["games_played"]
@@ -459,9 +464,6 @@ def _build_feature_vectors(conn, min_games: int) -> dict:
 
 
 def _standardize(vectors: dict) -> dict:
-    """Z-score each feature across the population so pts (~0-25) and
-    fg_pct (~0-0.6) contribute fairly to the distance calculation instead
-    of raw-scale stats dominating."""
     if not vectors:
         return {}
     means, stdevs = {}, {}
@@ -495,19 +497,19 @@ def _cosine_similarity(a: dict, b: dict) -> float:
 def similar_players(
     player_id: int,
     limit: int = Query(5, ge=1, le=20),
-    min_games: int = Query(50, ge=0, description="Minimum career games to be eligible"),
+    min_games: int = Query(50, ge=0),
 ):
     """
-    Finds the most statistically similar players by career profile.
-    Pipeline: weighted career averages -> z-score standardization across
-    the whole eligible player pool -> cosine similarity against every
-    other player -> top N by score. Built without an ML library so the
-    whole pipeline is auditable in this file.
+    Finds the most statistically similar players by career profile,
+    WITHIN THE TARGET PLAYER'S OWN LEAGUE. The league isn't a query param
+    here on purpose - it's derived from the target player's own row, so
+    there's no way to accidentally request a mismatched pool.
     """
     conn = get_conn()
-    fetch_player(conn, player_id)  # 404s if the target player doesn't exist
+    target = fetch_player(conn, player_id)
+    league = target["league"]
 
-    raw_vectors = _build_feature_vectors(conn, min_games)
+    raw_vectors = _build_feature_vectors(conn, min_games, league)
     if player_id not in raw_vectors:
         conn.close()
         raise HTTPException(
@@ -524,9 +526,6 @@ def similar_players(
         if pid == player_id:
             continue
         cos_sim = _cosine_similarity(target_vec, vec)
-        # Cosine similarity on standardized stats typically lands in a
-        # positive-but-imperfect range for comparable players; clamp and
-        # scale to a 0-100 "similarity %" that's intuitive to read.
         similarity_pct = max(0.0, min(1.0, (cos_sim + 1) / 2)) * 100
         scored.append((pid, similarity_pct))
 
@@ -538,9 +537,7 @@ def similar_players(
         p = fetch_player(conn, pid)
         vec = raw_vectors[pid]
         results.append(SimilarPlayer(
-            player=PlayerSummary(id=p["id"], name=p["name"], draft_year=p["draft_year"],
-                                  last_active_year=p["last_active_year"],
-                                  position=p["position"], team_abbreviation=p["team_abbreviation"]),
+            player=_player_summary(p),
             similarity_pct=round(pct, 1),
             ppg=round(vec["pts"], 1), rpg=round(vec["reb"], 1), apg=round(vec["ast"], 1),
         ))
@@ -567,28 +564,22 @@ class DraftClassResponse(BaseModel):
 
 
 @app.get("/draft-years", response_model=list[int])
-def list_draft_years():
-    """All draft years present in the data, for populating a year selector."""
+def list_draft_years(league: str = Query("WNBA", pattern=LEAGUE_PATTERN)):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT DISTINCT draft_year FROM players WHERE draft_year IS NOT NULL ORDER BY draft_year DESC"
+        "SELECT DISTINCT draft_year FROM players WHERE league = ? AND draft_year IS NOT NULL ORDER BY draft_year DESC",
+        (league,),
     ).fetchall()
     conn.close()
     return [r["draft_year"] for r in rows]
 
 
 @app.get("/draft-classes/{draft_year}", response_model=DraftClassResponse)
-def draft_class(draft_year: int):
-    """
-    All players from a given draft year. NOTE: we don't have actual draft
-    pick order (that's a separate Basketball-Reference page we haven't
-    scraped) — sorted by career games played as a reasonable "impact" proxy
-    instead. This is NOT real draft position, and the frontend should not
-    present it as such.
-    """
+def draft_class(draft_year: int, league: str = Query("WNBA", pattern=LEAGUE_PATTERN)):
     conn = get_conn()
     players = conn.execute(
-        "SELECT * FROM players WHERE draft_year = ? ORDER BY name", (draft_year,)
+        "SELECT * FROM players WHERE draft_year = ? AND league = ? ORDER BY name",
+        (draft_year, league),
     ).fetchall()
 
     results = []
@@ -603,9 +594,7 @@ def draft_class(draft_year: int):
         career_ppg = round(weighted_pts / total_gp, 1) if total_gp else None
 
         results.append(DraftClassPlayer(
-            player=PlayerSummary(id=p["id"], name=p["name"], draft_year=p["draft_year"],
-                                  last_active_year=p["last_active_year"],
-                                  position=p["position"], team_abbreviation=p["team_abbreviation"]),
+            player=_player_summary(p),
             career_games=total_gp, career_ppg=career_ppg,
         ))
 
@@ -648,17 +637,12 @@ def season_finder(
     team: Optional[str] = None,
     draft_year: Optional[int] = None,
     season_year: Optional[int] = None,
-    min_games: int = Query(10, ge=0, description="Minimum games that season to avoid small-sample noise"),
+    league: str = Query("WNBA", pattern=LEAGUE_PATTERN),
+    min_games: int = Query(10, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
-    """
-    Exploration query: find every player-season matching a set of stat
-    thresholds and filters. All filters are optional and AND together.
-    Position and draft_year come from the players table; team and games
-    are season-specific (a player's team can change year to year).
-    """
-    conditions = ["s.games_played >= ?"]
-    params = [min_games]
+    conditions = ["p.league = ?", "s.games_played >= ?"]
+    params = [league, min_games]
 
     filters = [
         (min_pts, "s.pts >= ?"), (min_reb, "s.reb >= ?"), (min_ast, "s.ast >= ?"),
@@ -676,7 +660,7 @@ def season_finder(
 
     conn = get_conn()
     rows = conn.execute(
-        f"""SELECT p.id, p.name, p.draft_year, p.last_active_year, p.position, p.team_abbreviation,
+        f"""SELECT p.id, p.name, p.league, p.draft_year, p.last_active_year, p.position, p.team_abbreviation,
                    s.season_year, s.team_abbreviation as season_team, s.games_played,
                    s.pts, s.reb, s.ast, s.stl, s.blk, s.ts_pct, s.per, s.win_shares
             FROM player_season_stats s JOIN players p ON p.id = s.player_id
@@ -689,9 +673,7 @@ def season_finder(
 
     results = [
         SeasonFinderResult(
-            player=PlayerSummary(id=r["id"], name=r["name"], draft_year=r["draft_year"],
-                                  last_active_year=r["last_active_year"],
-                                  position=r["position"], team_abbreviation=r["team_abbreviation"]),
+            player=_player_summary(r),
             season_year=r["season_year"], team_abbreviation=r["season_team"],
             games_played=r["games_played"], pts=r["pts"], reb=r["reb"], ast=r["ast"],
             stl=r["stl"], blk=r["blk"], ts_pct=r["ts_pct"], per=r["per"], win_shares=r["win_shares"],

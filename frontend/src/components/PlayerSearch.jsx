@@ -3,11 +3,19 @@ import { searchPlayers } from '../api'
 import Avatar from './Avatar'
 import TeamBadge from './TeamBadge'
 
-export default function PlayerSearch({ label, selectedPlayer, onSelect, align = 'left', seasonTeam, onDraftYearClick }) {
+export default function PlayerSearch({ label, selectedPlayer, onSelect, align = 'left', league = 'WNBA', seasonTeam, onDraftYearClick }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const debounceRef = useRef(null)
+
+  // Clear any in-progress search when the league changes, so stale text/
+  // results from the other league don't linger in an unselected search box.
+  useEffect(() => {
+    setQuery('')
+    setResults([])
+    setOpen(false)
+  }, [league])
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -17,7 +25,7 @@ export default function PlayerSearch({ label, selectedPlayer, onSelect, align = 
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       try {
-        const data = await searchPlayers(query)
+        const data = await searchPlayers(query, league)
         setResults(data.slice(0, 8))
       } catch (err) {
         console.error(err)
@@ -25,7 +33,7 @@ export default function PlayerSearch({ label, selectedPlayer, onSelect, align = 
       }
     }, 250)
     return () => clearTimeout(debounceRef.current)
-  }, [query])
+  }, [query, league])
 
   if (selectedPlayer) {
     const displayTeam = seasonTeam || selectedPlayer.team_abbreviation
@@ -42,7 +50,7 @@ export default function PlayerSearch({ label, selectedPlayer, onSelect, align = 
               {selectedPlayer.name}
             </div>
             <div className={`flex items-center gap-2 mt-1 ${align === 'right' ? 'sm:flex-row-reverse' : ''}`}>
-              {displayTeam && <TeamBadge abbr={displayTeam} />}
+              {displayTeam && <TeamBadge abbr={displayTeam} league={selectedPlayer.league} />}
               <span className="text-sm text-ink-muted font-body">
                 {selectedPlayer.position || '—'} · Drafted{' '}
                 {selectedPlayer.draft_year && onDraftYearClick ? (

@@ -1,6 +1,7 @@
 ﻿# --- Data pipeline (scraping logic - not shared publicly) ---
 seed_data.py
 seed_from_bref.py
+seed_nba_from_bref.py
 
 # --- Debug/diagnostic scratch scripts from development ---
 diagnose_bref.py
@@ -10,6 +11,17 @@ verify_scenarios.py
 verify_season_team.py
 check_db.py
 patch_cors.py
+diagnose_nba_bref.py
+diagnose_nba_fields.py
+diagnose_nba_playerid.py
+check_nba_db.py
+final_check.py
+verify_shared_names.py
+verify_migration.py
+migrate_add_league.py
+
+# --- Database backups (local safety nets, not for version control) ---
+*_backup_*.db
 
 # NOTE: wnba.db is intentionally NOT ignored - it's the actual dataset,
 # and the deployed app / anyone cloning this repo needs it to run without
