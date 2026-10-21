@@ -10,6 +10,9 @@ import PlayerDevelopment from './components/PlayerDevelopment'
 import TeamHistory from './components/TeamHistory'
 import DraftClassExplorer from './components/DraftClassExplorer'
 import SeasonFinder from './components/SeasonFinder'
+import GroupCompare from './components/GroupCompare'
+import AwardsPage from './components/AwardsPage'
+import AwardBadges from './components/AwardBadges'
 import RecentSearches from './components/RecentSearches'
 import { comparePlayers, getPlayer, getCareerAverages } from './api'
 import { addRecentSearch } from './recentSearches'
@@ -22,13 +25,14 @@ const LEAGUE_RANGES = {
   NBA: { earliest: 1950, current: 2026 },
 }
 
-function SidePanel({ side, highlights, seasonYear, align, onJumpToSeason, mode }) {
+function SidePanel({ playerId, side, highlights, seasonYear, align, onJumpToSeason, mode }) {
   return (
     <div className="mt-1">
       {mode === 'season' && (side.status !== 'active' || !side.stats) ? (
         <EmptyStateCard status={side.status} name={side.player.name} year={seasonYear} align={align} />
       ) : null}
       {mode === 'career' && <HighlightBadges highlights={highlights} onJumpToSeason={onJumpToSeason} />}
+      <AwardBadges playerId={playerId} seasonYear={mode === 'season' ? seasonYear : null} align={align} />
     </div>
   )
 }
@@ -191,6 +195,8 @@ export default function App() {
   }
 
   const [showSeasonFinder, setShowSeasonFinder] = useState(false)
+  const [showGroups, setShowGroups] = useState(false)
+  const [showAwards, setShowAwards] = useState(false)
   const [showCareerInfo, setShowCareerInfo] = useState(false)
   const [finderInitialFilters, setFinderInitialFilters] = useState(null)
 
@@ -199,6 +205,21 @@ export default function App() {
     setMode('season')
     setSeasonYear(year)
     setShowSeasonFinder(false)
+  }
+
+  // Awards page -> Head to Head: load the winner into the first free slot and jump to their award season.
+  const pickFromAwards = (playerId, year) => {
+    getPlayer(playerId)
+      .then((p) => {
+        if (!player1) setPlayer1(p)
+        else if (!player2 && p.id !== player1.id) setPlayer2(p)
+        else setPlayer2(p)
+        if (p.league) setLeague(p.league)
+        setMode('season')
+        setSeasonYear(year)
+        setShowAwards(false)
+      })
+      .catch((err) => console.error('Could not load award winner:', err))
   }
 
   const restoreRecentSearch = (item) => {
@@ -258,9 +279,32 @@ export default function App() {
         >
           🔍 {showSeasonFinder ? 'Hide Season Finder' : 'Explore seasons instead → Season Finder'}
         </button>
+        <button
+          onClick={() => { setShowGroups(!showGroups); setShowAwards(false) }}
+          className="mt-2 block mx-auto text-xs text-ball hover:text-ink-primary transition-colors font-body underline underline-offset-2"
+        >
+          👥 {showGroups ? '← Back to Head to Head' : 'Compare groups of players → Group Comparison'}
+        </button>
+        <button
+          onClick={() => { setShowAwards(!showAwards); setShowGroups(false) }}
+          className="mt-2 block mx-auto text-xs text-ball hover:text-ink-primary transition-colors font-body underline underline-offset-2"
+        >
+          🏅 {showAwards ? '← Back to Head to Head' : 'Year-by-year winners → Awards'}
+        </button>
       </header>
 
       <RecentSearches refreshKey={recentRefresh} onRestore={restoreRecentSearch} />
+
+      {/* group-mode-layout: always mounted so picks survive switching back and forth; hidden when off */}
+      <div className={`max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 mb-6 ${showGroups ? '' : 'hidden'}`}>
+        <GroupCompare league={league} onClose={() => setShowGroups(false)} />
+      </div>
+
+      {showAwards && (
+        <div className="max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 mb-6">
+          <AwardsPage league={league} onPick={pickFromAwards} onClose={() => setShowAwards(false)} />
+        </div>
+      )}
 
       {showSeasonFinder && (
         <div className="max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 mb-6">
@@ -274,7 +318,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10">
+      <main className={`max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 ${showGroups || showAwards ? 'hidden' : ''}`}>
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 mb-8">
           <PlayerSearch
             label="Player 1" selectedPlayer={player1} onSelect={setPlayer1} align="left"
@@ -341,9 +385,9 @@ export default function App() {
         ) : comparison ? (
           <div>
             <div className="grid grid-cols-2 gap-4 mb-2">
-              <SidePanel side={comparison.player_1} highlights={career1?.highlights} seasonYear={seasonYear} align="left" onJumpToSeason={jumpToSeason} mode={mode} />
+              <SidePanel playerId={player1.id} side={comparison.player_1} highlights={career1?.highlights} seasonYear={seasonYear} align="left" onJumpToSeason={jumpToSeason} mode={mode} />
               <div className="text-right">
-                <SidePanel side={comparison.player_2} highlights={career2?.highlights} seasonYear={seasonYear} align="right" onJumpToSeason={jumpToSeason} mode={mode} />
+                <SidePanel playerId={player2.id} side={comparison.player_2} highlights={career2?.highlights} seasonYear={seasonYear} align="right" onJumpToSeason={jumpToSeason} mode={mode} />
               </div>
             </div>
 
