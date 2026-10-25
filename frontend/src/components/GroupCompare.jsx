@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Avatar from './Avatar'
+import { seasonLabel } from '../seasonLabel'
 import { searchPlayersForGroup, compareGroups } from '../groupApi'
 
 const RANGES = { WNBA: { earliest: 1997, current: 2026 }, NBA: { earliest: 1950, current: 2026 } }
@@ -283,7 +284,7 @@ export default function GroupCompare({ league, onClose }) {
           <span className="text-xs uppercase tracking-widest text-ink-muted font-body shrink-0">Season</span>
           <input type="range" min={range.earliest} max={range.current} value={year}
             onChange={(e) => setYear(Number(e.target.value))} className="flex-1 accent-ball" />
-          <span className="font-mono tabular text-lg text-ball font-semibold w-14 text-right">{year}</span>
+          <span className="font-mono tabular text-lg text-ball font-semibold w-24 text-right">{seasonLabel(league, year)}</span>
         </div>
       )}
 

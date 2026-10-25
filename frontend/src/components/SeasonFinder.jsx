@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Avatar from './Avatar'
 import { findSeasons } from '../api'
 import { addRecentSearch } from '../recentSearches'
+import { seasonLabel } from '../seasonLabel'
 
 const POSITIONS = ['G', 'F', 'C', 'G-F', 'F-G', 'F-C', 'C-F']
 
@@ -30,7 +31,7 @@ function buildLabel(v, league) {
   if (v.minWinShares) parts.push(`WS > ${v.minWinShares}`)
   if (v.position) parts.push(`Pos: ${v.position}`)
   if (v.team) parts.push(`Team: ${v.team.toUpperCase()}`)
-  if (v.seasonYear) parts.push(`Season ${v.seasonYear}`)
+  if (v.seasonYear) parts.push(`Season ${seasonLabel(league, v.seasonYear)}`)
   if (v.draftYear) parts.push(`Drafted ${v.draftYear}`)
   const filterText = parts.length > 0 ? parts.join(', ') : 'All seasons'
   return `${league} Seasons: ${filterText}`
@@ -178,7 +179,7 @@ export default function SeasonFinder({ league = 'WNBA', onCompare, onClose, init
               className="bg-court-bg border border-court-line rounded px-2 py-1 text-ink-primary font-mono uppercase outline-none focus:border-ball" />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-muted font-body">
-            Season
+            {league === 'NBA' ? 'Season ends (2016 = 2015-16)' : 'Season'}
             <input type="number" value={seasonYear} onChange={(e) => setSeasonYear(e.target.value)}
               placeholder="Any"
               className="bg-court-bg border border-court-line rounded px-2 py-1 text-ink-primary font-mono outline-none focus:border-ball" />
@@ -203,7 +204,7 @@ export default function SeasonFinder({ league = 'WNBA', onCompare, onClose, init
                   <Avatar name={r.player.name} size={28} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-ink-primary font-body truncate">
-                      {r.player.name} <span className="text-ink-faint">· {r.season_year}</span>
+                      {r.player.name} <span className="text-ink-faint">· {seasonLabel(league, r.season_year)}</span>
                     </div>
                     <div className="text-[10px] text-ink-faint font-mono tabular">
                       {r.pts} PPG · {r.reb} RPG · {r.ast} APG

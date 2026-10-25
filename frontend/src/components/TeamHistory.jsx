@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import TeamBadge, { WNBA_TEAM_NAMES, NBA_TEAM_NAMES } from './TeamBadge'
 import { getPlayerSeasonHistory } from '../api'
+import { seasonLabel } from '../seasonLabel'
 
 const CURRENT_YEAR = 2026
 
@@ -20,8 +21,11 @@ function computeStints(history) {
 function StintRow({ stint, isLast, playerStillActive, league }) {
   const names = league === 'NBA' ? NBA_TEAM_NAMES : WNBA_TEAM_NAMES
   const fullName = names[stint.team] || stint.team
-  const endLabel = isLast && playerStillActive ? 'Present' : stint.end
-  const yearRange = stint.start === stint.end && !(isLast && playerStillActive) ? `${stint.start}` : `${stint.start}–${endLabel}`
+  const endLabel = isLast && playerStillActive ? 'Present' : seasonLabel(league, stint.end)
+  const sep = league === 'NBA' ? ' to ' : '–'
+  const yearRange = stint.start === stint.end && !(isLast && playerStillActive)
+    ? seasonLabel(league, stint.start)
+    : `${seasonLabel(league, stint.start)}${sep}${endLabel}`
   return (
     <div className="flex items-center gap-3 py-1.5">
       <TeamBadge abbr={stint.team} league={league} />

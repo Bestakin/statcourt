@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Avatar from './Avatar'
+import { seasonLabel } from '../seasonLabel'
 import { getAwardCatalog, getAwardHistory } from '../awardsApi'
 
 // Year-by-year winners for each award in the chosen league.
@@ -62,7 +63,7 @@ export default function AwardsPage({ league, onPick, onClose }) {
 
       {info && (
         <p className="text-[11px] text-ink-faint font-body mb-3">
-          {info.count} winners · {info.first_season}–{info.last_season}. Tap “Compare” to load a winner into Head to Head for that season.
+          {info.count} winners · {seasonLabel(league, info.first_season)} to {seasonLabel(league, info.last_season)}. Tap “Compare” to load a winner into Head to Head for that season.
         </p>
       )}
 
@@ -73,7 +74,7 @@ export default function AwardsPage({ league, onPick, onClose }) {
         <ul className="divide-y divide-court-line border border-court-line rounded-lg overflow-hidden">
           {history.winners.map((w) => (
             <li key={`${w.season_year}-${w.player_name}`} className="flex items-center gap-3 px-3 py-2 bg-court-surface2/40">
-              <span className="font-mono tabular text-sm text-ball w-12 shrink-0">{w.season_year}</span>
+              <span className="font-mono tabular text-sm text-ball w-16 shrink-0">{seasonLabel(league, w.season_year)}</span>
               <Avatar name={w.player_name} size={24} />
               <div className="flex-1 min-w-0">
                 <p className="font-body text-sm text-ink-primary truncate">

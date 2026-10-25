@@ -1,8 +1,9 @@
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { getPlayerSeasonHistory } from '../api'
+import { seasonLabel } from '../seasonLabel'
 
 const STAT_OPTIONS = [
   { key: 'pts', label: 'PPG' },
@@ -12,11 +13,11 @@ const STAT_OPTIONS = [
   { key: 'win_shares', label: 'Win Shares' },
 ]
 
-function CustomTooltip({ active, payload, label, name1, name2 }) {
+function CustomTooltip({ active, payload, label, name1, name2, league }) {
   if (!active || !payload || payload.length === 0) return null
   return (
     <div className="bg-court-surface2 border border-court-line rounded-md px-3 py-2 text-xs font-body">
-      <div className="text-ink-muted mb-1">{label}</div>
+      <div className="text-ink-muted mb-1">{seasonLabel(league, label)}</div>
       {payload.map((p) => (
         <div key={p.dataKey} style={{ color: p.color }} className="tabular font-mono">
           {p.dataKey}: {p.value ?? '—'}
@@ -90,6 +91,8 @@ export default function PlayerDevelopment({ player1, player2 }) {
           <CartesianGrid stroke="#2A4363" strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="season_year"
+            tickFormatter={(y) => seasonLabel(player1.league, y)}
+            minTickGap={14}
             tick={{ fill: '#8FA0B3', fontSize: 11, fontFamily: 'Inter' }}
             axisLine={{ stroke: '#2A4363' }}
             tickLine={false}
@@ -99,7 +102,7 @@ export default function PlayerDevelopment({ player1, player2 }) {
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<CustomTooltip name1={player1.name} name2={player2.name} />} />
+          <Tooltip content={<CustomTooltip name1={player1.name} name2={player2.name} league={player1.league} />} />
           <Line
             type="monotone" dataKey={player1.name} stroke="#FF7A1A"
             strokeWidth={2} dot={{ r: 3 }} connectNulls={false} animationDuration={400}

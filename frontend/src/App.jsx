@@ -16,6 +16,7 @@ import AwardBadges from './components/AwardBadges'
 import RecentSearches from './components/RecentSearches'
 import { comparePlayers, getPlayer, getCareerAverages } from './api'
 import { addRecentSearch } from './recentSearches'
+import { seasonLabel } from './seasonLabel'
 
 // Per-league season ranges, based on what we actually seeded. NBA's early
 // BAA years (1947-49) aren't in the data - Basketball-Reference files
@@ -25,14 +26,14 @@ const LEAGUE_RANGES = {
   NBA: { earliest: 1950, current: 2026 },
 }
 
-function SidePanel({ playerId, side, highlights, seasonYear, align, onJumpToSeason, mode }) {
+function SidePanel({ playerId, side, highlights, seasonYear, align, onJumpToSeason, mode, league }) {
   return (
     <div className="mt-1">
       {mode === 'season' && (side.status !== 'active' || !side.stats) ? (
-        <EmptyStateCard status={side.status} name={side.player.name} year={seasonYear} align={align} />
+        <EmptyStateCard status={side.status} name={side.player.name} year={seasonLabel(league, seasonYear)} align={align} />
       ) : null}
-      {mode === 'career' && <HighlightBadges highlights={highlights} onJumpToSeason={onJumpToSeason} />}
-      <AwardBadges playerId={playerId} seasonYear={mode === 'season' ? seasonYear : null} align={align} />
+      {mode === 'career' && <HighlightBadges highlights={highlights} onJumpToSeason={onJumpToSeason} league={league} />}
+      <AwardBadges playerId={playerId} seasonYear={mode === 'season' ? seasonYear : null} align={align} league={league} />
     </div>
   )
 }
@@ -147,7 +148,7 @@ export default function App() {
         // Record this comparison for the Recent Searches panel.
         const label = mode === 'career'
           ? `${player1.name} vs ${player2.name} (Career)`
-          : `${player1.name} vs ${player2.name} (${seasonYear})`
+          : `${player1.name} vs ${player2.name} (${seasonLabel(league, seasonYear)})`
         addRecentSearch({
           id: `compare-${player1.id}-${player2.id}-${mode}-${mode === 'season' ? seasonYear : ''}`,
           type: 'compare',
@@ -370,7 +371,7 @@ export default function App() {
               onChange={(e) => setSeasonYear(Number(e.target.value))}
               className="flex-1 accent-ball"
             />
-            <span className="font-mono tabular text-lg text-ball font-semibold w-14 text-right">{seasonYear}</span>
+            <span className="font-mono tabular text-lg text-ball font-semibold w-24 text-right">{seasonLabel(league, seasonYear)}</span>
           </div>
         )}
 
@@ -385,9 +386,9 @@ export default function App() {
         ) : comparison ? (
           <div>
             <div className="grid grid-cols-2 gap-4 mb-2">
-              <SidePanel playerId={player1.id} side={comparison.player_1} highlights={career1?.highlights} seasonYear={seasonYear} align="left" onJumpToSeason={jumpToSeason} mode={mode} />
+              <SidePanel playerId={player1.id} side={comparison.player_1} highlights={career1?.highlights} seasonYear={seasonYear} align="left" onJumpToSeason={jumpToSeason} mode={mode} league={league} />
               <div className="text-right">
-                <SidePanel playerId={player2.id} side={comparison.player_2} highlights={career2?.highlights} seasonYear={seasonYear} align="right" onJumpToSeason={jumpToSeason} mode={mode} />
+                <SidePanel playerId={player2.id} side={comparison.player_2} highlights={career2?.highlights} seasonYear={seasonYear} align="right" onJumpToSeason={jumpToSeason} mode={mode} league={league} />
               </div>
             </div>
 

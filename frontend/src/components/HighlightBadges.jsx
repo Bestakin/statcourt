@@ -1,6 +1,8 @@
-﻿const UNITS = { pts: 'PPG', reb: 'RPG', ast: 'APG', win_shares: ' WS' }
+import { seasonLabel } from '../seasonLabel'
 
-export default function HighlightBadges({ highlights, onJumpToSeason }) {
+const UNITS = { pts: 'PPG', reb: 'RPG', ast: 'APG', win_shares: ' WS' }
+
+export default function HighlightBadges({ highlights, onJumpToSeason, league }) {
   if (!highlights || highlights.length === 0) return null
 
   return (
@@ -12,7 +14,7 @@ export default function HighlightBadges({ highlights, onJumpToSeason }) {
           title={`Tap to jump to this season`}
           className="text-[10px] font-body bg-court-surface2 border border-court-line rounded-full px-2.5 py-1 text-ink-muted hover:border-ball hover:text-ink-primary transition-colors cursor-pointer"
         >
-          🏆 {h.label.replace('Best ', '').replace(' Season', '')}: {h.value}{UNITS[h.stat] || ''} in {h.season_year}
+          🏆 {h.label.replace('Best ', '').replace(' Season', '')}: {h.value}{UNITS[h.stat] || ''} in {seasonLabel(league, h.season_year)}
         </button>
       ))}
     </div>

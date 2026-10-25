@@ -83,3 +83,5 @@ awards_diag.txt
 awards_report.txt
 
 *.bak_before_*
+
+patch_season_labels.py
