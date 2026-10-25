@@ -22,28 +22,48 @@ export default function AwardBadges({ playerId, seasonYear, align = 'left', leag
   if (!data || data.awards.length === 0) return null
 
   const justify = align === 'right' ? 'justify-end' : 'justify-start'
+  const textAlign = align === 'right' ? 'text-right' : ''
+  const tag = `text-[9px] uppercase tracking-widest font-body text-ink-faint mb-1 ${textAlign}`
+  const label = seasonYear ? seasonLabel(league, seasonYear) : null
+  const wonNow = seasonYear ? data.awards.filter((a) => a.seasons.includes(seasonYear)) : []
 
   return (
     <div className="mt-2">
+      {seasonYear && (
+        <div className="mb-2">
+          <div className={tag}>Won in {label}</div>
+          {wonNow.length > 0 ? (
+            <div className={`flex flex-wrap gap-1.5 ${justify}`}>
+              {wonNow.map((a) => (
+                <span
+                  key={a.award}
+                  title={`${a.name}, ${label}`}
+                  className="text-[10px] font-body font-semibold bg-ball text-court-bg border border-ball rounded-full px-2.5 py-1"
+                >
+                  🏅 {a.short}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className={`text-[10px] font-body text-ink-faint ${textAlign}`}>No major awards this season</p>
+          )}
+        </div>
+      )}
+      <div className={tag}>Career awards{seasonYear ? ' (all seasons)' : ''}</div>
       <div className={`flex flex-wrap gap-1.5 ${justify}`}>
-        {data.awards.map((a) => {
-          const wonThisSeason = seasonYear && a.seasons.includes(seasonYear)
-          return (
-            <button
-              key={a.award}
-              onClick={() => setOpen(open === a.award ? null : a.award)}
-              title={`${a.name}: ${a.seasons.map((y) => seasonLabel(league, y)).join(', ')}`}
-              className={`text-[10px] font-body bg-court-surface2 border rounded-full px-2.5 py-1 transition-colors cursor-pointer hover:text-ink-primary ${
-                wonThisSeason ? 'border-ball text-ball' : 'border-court-line text-ink-muted hover:border-ball'
-              }`}
-            >
-              🏅 {a.count > 1 ? `${a.count}× ` : ''}{a.short}
-            </button>
-          )
-        })}
+        {data.awards.map((a) => (
+          <button
+            key={a.award}
+            onClick={() => setOpen(open === a.award ? null : a.award)}
+            title={`${a.name}: ${a.seasons.map((y) => seasonLabel(league, y)).join(', ')}`}
+            className="text-[10px] font-body bg-court-surface2 border border-court-line text-ink-muted hover:border-ball hover:text-ink-primary rounded-full px-2.5 py-1 transition-colors cursor-pointer"
+          >
+            🏅 {a.count > 1 ? `${a.count}× ` : ''}{a.short}
+          </button>
+        ))}
       </div>
       {open && (
-        <p className={`mt-1.5 text-[10px] font-body text-ink-faint ${align === 'right' ? 'text-right' : ''}`}>
+        <p className={`mt-1.5 text-[10px] font-body text-ink-faint ${textAlign}`}>
           {data.awards.find((a) => a.award === open)?.name}:{' '}
           <span className="font-mono tabular">{data.awards.find((a) => a.award === open)?.seasons.map((y) => seasonLabel(league, y)).join(', ')}</span>
         </p>
