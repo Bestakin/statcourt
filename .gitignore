@@ -106,3 +106,6 @@ patch_logo_basketball.py
 
 patch_year_bump.py
 *.bak_before_2027
+
+patch_team_v2.py
+*.bak_before_v2

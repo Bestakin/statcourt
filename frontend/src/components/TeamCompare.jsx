@@ -8,6 +8,17 @@ const RANGES = { WNBA: { earliest: 1997, current: 2026 }, NBA: { earliest: 1982,
 const label = (league, y) => (league === 'NBA' ? `${y - 1}-${String(y).slice(-2)}` : String(y))
 const n1 = (v) => (v == null ? '—' : v.toFixed(1))
 
+function SeasonSlider({ title, colorClass, league, range, value, onChange }) {
+  return (
+    <div className="flex items-center gap-4 py-3">
+      <span className={`text-xs uppercase tracking-widest font-body shrink-0 ${colorClass}`}>{title}</span>
+      <input type="range" min={range.earliest} max={range.current} value={value}
+        onChange={(e) => onChange(Number(e.target.value))} className="flex-1 accent-ball" />
+      <span className="font-mono tabular text-lg text-ball font-semibold w-20 text-right">{label(league, value)}</span>
+    </div>
+  )
+}
+
 function TeamSelect({ title, colorClass, value, onChange, teams, otherValue }) {
   return (
     <div>
@@ -18,7 +29,7 @@ function TeamSelect({ title, colorClass, value, onChange, teams, otherValue }) {
         {teams.map((t) => (
           <option key={t.abbreviation} value={t.abbreviation}
             disabled={!t.usable || t.abbreviation === otherValue}>
-            {t.abbreviation}{t.usable ? '' : ' — data not reliable'}
+            {t.name ? `${t.name} (${t.abbreviation})` : t.abbreviation}{t.usable ? '' : ' — data not reliable'}
           </option>
         ))}
       </select>
@@ -42,19 +53,22 @@ function FiveCell({ f, line, align }) {
   )
 }
 
-function Fives({ data, nameA, nameB }) {
+function Fives({ data, league }) {
   const byA = Object.fromEntries(data.a.players.map((p) => [p.player_id, p]))
   const byB = Object.fromEntries(data.b.players.map((p) => [p.player_id, p]))
   const rows = Math.max(data.five_a.length, data.five_b.length)
+  const titleA = `${data.name_a || data.team_a} · ${label(league, data.season_year)}`
+  const titleB = `${data.name_b || data.team_b} · ${label(league, data.season_year_b)}`
   return (
     <div className="mb-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 mb-2">
-        <div className="text-xs uppercase tracking-widest text-ball font-body">{nameA} · most starts</div>
-        <div className="text-xs uppercase tracking-widest text-sky-400 font-body sm:text-right">{nameB} · most starts</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 mb-1">
+        <div className="text-xs uppercase tracking-widest text-ball font-body">{titleA}</div>
+        <div className="text-xs uppercase tracking-widest text-sky-400 font-body sm:text-right">{titleB}</div>
       </div>
+      <div className="text-[11px] text-ink-muted font-body mb-3">The five players with the most starts</div>
       <div className="space-y-3">
         {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 relative">
+          <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
             <FiveCell f={data.five_a[i]} line={data.five_a[i] && byA[data.five_a[i].player_id]} align="left" />
             <FiveCell f={data.five_b[i]} line={data.five_b[i] && byB[data.five_b[i].player_id]} align="right" />
           </div>
@@ -69,47 +83,54 @@ function Fives({ data, nameA, nameB }) {
 
 export default function TeamCompare({ league, onClose }) {
   const range = RANGES[league] || RANGES.WNBA
-  const [year, setYear] = useState(range.current)
-  const [teams, setTeams] = useState([])
+  const [split, setSplit] = useState(false)        // compare two different seasons
+  const [yearA, setYearA] = useState(range.current)
+  const [yearB, setYearB] = useState(range.current)
+  const [teamsA, setTeamsA] = useState([])
+  const [teamsB, setTeamsB] = useState([])
   const [teamA, setTeamA] = useState('')
   const [teamB, setTeamB] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [teamsError, setTeamsError] = useState(null)
+  const yb = split ? yearB : yearA
 
   useEffect(() => {
     setTeamA(''); setTeamB(''); setData(null); setError(null)
-    setYear((y) => Math.min(Math.max(y, range.earliest), range.current))
+    setYearA((y) => Math.min(Math.max(y, range.earliest), range.current))
+    setYearB((y) => Math.min(Math.max(y, range.earliest), range.current))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league])
 
-  useEffect(() => {
+  const loadTeams = (year, setTeams, setTeam) => {
     const ctl = new AbortController()
     setTeamsError(null)
     listTeams(league, year, ctl.signal)
       .then((res) => {
         setTeams(res.teams)
         const ok = new Set(res.teams.filter((t) => t.usable).map((t) => t.abbreviation))
-        setTeamA((t) => (ok.has(t) ? t : ''))
-        setTeamB((t) => (ok.has(t) ? t : ''))
+        setTeam((t) => (ok.has(t) ? t : ''))
       })
       .catch((e) => { if (e.name !== 'AbortError') { setTeams([]); setTeamsError(e.message) } })
     return () => ctl.abort()
-  }, [league, year])
+  }
+  useEffect(() => loadTeams(yearA, setTeamsA, setTeamA), [league, yearA]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => loadTeams(yb, setTeamsB, setTeamB), [league, yb]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ready = teamA && teamB && teamA !== teamB
+  const ready = teamA && teamB && !(teamA === teamB && yearA === yb)
   useEffect(() => {
     if (!ready) { setData(null); setError(null); return }
     const ctl = new AbortController()
     setLoading(true); setError(null)
-    compareTeams({ league, year, a: teamA, b: teamB }, ctl.signal)
+    compareTeams({ league, year: yearA, yearB: yb, a: teamA, b: teamB }, ctl.signal)
       .then(setData)
       .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setData(null) } })
       .finally(() => setLoading(false))
     return () => ctl.abort()
-  }, [league, year, teamA, teamB, ready])
+  }, [league, yearA, yb, teamA, teamB, ready])
 
+  const sameSeason = yearA === yb
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -117,16 +138,28 @@ export default function TeamCompare({ league, onClose }) {
         <button onClick={onClose} className="text-xs text-ink-faint hover:text-ink-primary transition-colors font-body">Close ✕</button>
       </div>
 
-      <div className="flex items-center gap-4 mb-6 border-t border-b border-court-line py-3">
-        <span className="text-xs uppercase tracking-widest text-ink-muted font-body shrink-0">Season</span>
-        <input type="range" min={range.earliest} max={range.current} value={year}
-          onChange={(e) => setYear(Number(e.target.value))} className="flex-1 accent-ball" />
-        <span className="font-mono tabular text-lg text-ball font-semibold w-20 text-right">{label(league, year)}</span>
+      <div className="border-t border-b border-court-line mb-6">
+        {split ? (
+          <>
+            <SeasonSlider title="Team A season" colorClass="text-ball" league={league} range={range} value={yearA} onChange={setYearA} />
+            <SeasonSlider title="Team B season" colorClass="text-sky-400" league={league} range={range} value={yearB} onChange={setYearB} />
+          </>
+        ) : (
+          <SeasonSlider title="Season" colorClass="text-ink-muted" league={league} range={range} value={yearA} onChange={setYearA} />
+        )}
+        <div className="pb-3 flex justify-center">
+          <button onClick={() => { if (!split) setYearB(yearA); setSplit(!split) }}
+            className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-body transition-colors ${
+              split ? 'bg-ball text-court-bg font-semibold' : 'bg-court-surface2 text-ink-muted hover:text-ink-primary'
+            }`}>
+            {split ? 'Different seasons: on' : 'Compare different seasons'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-        <TeamSelect title="Team A" colorClass="text-ball" value={teamA} onChange={setTeamA} teams={teams} otherValue={teamB} />
-        <TeamSelect title="Team B" colorClass="text-sky-400" value={teamB} onChange={setTeamB} teams={teams} otherValue={teamA} />
+        <TeamSelect title="Team A" colorClass="text-ball" value={teamA} onChange={setTeamA} teams={teamsA} otherValue={sameSeason ? teamB : ''} />
+        <TeamSelect title="Team B" colorClass="text-sky-400" value={teamB} onChange={setTeamB} teams={teamsB} otherValue={sameSeason ? teamA : ''} />
       </div>
 
       {teamsError ? (
@@ -142,8 +175,10 @@ export default function TeamCompare({ league, onClose }) {
         <p className="text-center text-ink-muted font-body py-6 text-sm">Loading…</p>
       ) : (
         <div className={`transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
-          <Fives data={data} nameA={data.team_a} nameB={data.team_b} />
-          <GroupResults data={data} nameA={data.team_a} nameB={data.team_b} hidePlayers />
+          <Fives data={data} league={league} />
+          <GroupResults data={data} hidePlayers
+            nameA={`${data.team_a}${sameSeason ? '' : ' ' + label(league, data.season_year)}`}
+            nameB={`${data.team_b}${sameSeason ? '' : ' ' + label(league, data.season_year_b)}`} />
           <p className="text-xs text-ink-muted font-body mt-5 leading-relaxed">{data.note}</p>
         </div>
       )}

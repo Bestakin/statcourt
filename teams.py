@@ -26,6 +26,36 @@ import groups
 router = APIRouter()
 FIRST_YEAR = {"WNBA": 1997, "NBA": 1982}   # NBA 1982 = the 1981-82 season, the first with games started
 
+# Basketball-Reference team codes -> names (names are era-specific where the code is, e.g. NJN, SEA, WSB).
+TEAM_NAMES = {
+    "NBA": {
+        "ATL": "Atlanta Hawks", "BOS": "Boston Celtics", "BRK": "Brooklyn Nets", "NJN": "New Jersey Nets",
+        "CHA": "Charlotte Bobcats", "CHH": "Charlotte Hornets", "CHO": "Charlotte Hornets", "CHI": "Chicago Bulls",
+        "CLE": "Cleveland Cavaliers", "DAL": "Dallas Mavericks", "DEN": "Denver Nuggets", "DET": "Detroit Pistons",
+        "GSW": "Golden State Warriors", "HOU": "Houston Rockets", "IND": "Indiana Pacers", "KCK": "Kansas City Kings",
+        "LAC": "Los Angeles Clippers", "SDC": "San Diego Clippers", "LAL": "Los Angeles Lakers",
+        "MEM": "Memphis Grizzlies", "VAN": "Vancouver Grizzlies", "MIA": "Miami Heat", "MIL": "Milwaukee Bucks",
+        "MIN": "Minnesota Timberwolves", "NOP": "New Orleans Pelicans", "NOH": "New Orleans Hornets",
+        "NOK": "New Orleans/Oklahoma City Hornets", "NYK": "New York Knicks", "OKC": "Oklahoma City Thunder",
+        "SEA": "Seattle SuperSonics", "ORL": "Orlando Magic", "PHI": "Philadelphia 76ers", "PHO": "Phoenix Suns",
+        "POR": "Portland Trail Blazers", "SAC": "Sacramento Kings", "SAS": "San Antonio Spurs",
+        "TOR": "Toronto Raptors", "UTA": "Utah Jazz", "WAS": "Washington Wizards", "WSB": "Washington Bullets",
+    },
+    "WNBA": {
+        "ATL": "Atlanta Dream", "CHI": "Chicago Sky", "CON": "Connecticut Sun", "DAL": "Dallas Wings",
+        "IND": "Indiana Fever", "LVA": "Las Vegas Aces", "LAS": "Los Angeles Sparks", "MIN": "Minnesota Lynx",
+        "NYL": "New York Liberty", "PHO": "Phoenix Mercury", "SEA": "Seattle Storm", "WAS": "Washington Mystics",
+        "GSV": "Golden State Valkyries", "TOR": "Toronto Tempo", "POR": "Portland Fire",
+        "CHA": "Charlotte Sting", "CLE": "Cleveland Rockers", "DET": "Detroit Shock", "HOU": "Houston Comets",
+        "MIA": "Miami Sol", "ORL": "Orlando Miracle", "SAC": "Sacramento Monarchs", "SAN": "San Antonio Stars",
+        "TUL": "Tulsa Shock", "UTA": "Utah Starzz",
+    },
+}
+
+
+def _name(league, code):
+    return TEAM_NAMES.get(league, {}).get(code)
+
 
 def _conn():
     c = sqlite3.connect(groups.DB_PATH)
@@ -43,6 +73,7 @@ class FiveMan(BaseModel):
 
 class TeamInfo(BaseModel):
     abbreviation: str
+    name: Optional[str] = None
     players: int
     usable: bool
     reason: Optional[str] = None
@@ -56,9 +87,12 @@ class TeamList(BaseModel):
 
 class TeamComparison(BaseModel):
     league: str
-    season_year: int
+    season_year: int          # team A's season
+    season_year_b: int        # team B's season (same as season_year unless comparing different seasons)
     team_a: str
     team_b: str
+    name_a: Optional[str] = None
+    name_b: Optional[str] = None
     five_a: list[FiveMan]
     five_b: list[FiveMan]
     a: groups.GroupSide
@@ -107,7 +141,7 @@ def list_teams(league: str = Query(..., pattern="^(WNBA|NBA)$"), year: int = Que
         for tm in names:
             rows = _team_rows(conn, league, year, tm)
             ok, why = _usable(rows)
-            out.append(TeamInfo(abbreviation=tm, players=len(rows), usable=ok, reason=why))
+            out.append(TeamInfo(abbreviation=tm, name=_name(league, tm), players=len(rows), usable=ok, reason=why))
     finally:
         conn.close()
     if not out:
@@ -127,11 +161,14 @@ def compare_teams(
     year: int = Query(..., ge=1946, le=2100),
     a: str = Query(..., min_length=2, max_length=4, description="team abbreviation, side A"),
     b: str = Query(..., min_length=2, max_length=4, description="team abbreviation, side B"),
+    year_b: Optional[int] = Query(None, ge=1946, le=2100, description="team B's season; defaults to `year`"),
 ):
+    yb = year if year_b is None else year_b
     _check_year(league, year)
+    _check_year(league, yb)
     a, b = a.upper(), b.upper()
-    if a == b:
-        raise HTTPException(400, "Pick two different teams")
+    if a == b and year == yb:
+        raise HTTPException(400, "Pick two different teams, or the same team in two different seasons")
     conn = _conn()
     try:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(player_season_stats)")}
@@ -141,13 +178,13 @@ def compare_teams(
         if "player_season_stints" not in tables:
             raise HTTPException(503, "Team data hasn't been loaded into this database yet")
         sides, fives = [], []
-        for tm in (a, b):
-            rows = _team_rows(conn, league, year, tm)
+        for tm, yr in ((a, year), (b, yb)):
+            rows = _team_rows(conn, league, yr, tm)
             ok, why = _usable(rows)
             if not ok:
-                raise HTTPException(404, f"{tm} {year}: {why}")
+                raise HTTPException(404, f"{tm} {yr}: {why}")
             five = _five(rows)
-            side, _ = groups._side(conn, [f.player_id for f in five], "season", year, team=tm)
+            side, _ = groups._side(conn, [f.player_id for f in five], "season", yr, team=tm)
             sides.append(side)
             fives.append(five)
     finally:
@@ -155,8 +192,10 @@ def compare_teams(
     if sides[0].totals.players == 0 or sides[1].totals.players == 0:
         raise HTTPException(404, "One team has no players with data for that selection")
     return TeamComparison(
-        league=league, season_year=year, team_a=a, team_b=b, five_a=fives[0], five_b=fives[1],
+        league=league, season_year=year, season_year_b=yb, team_a=a, team_b=b,
+        name_a=_name(league, a), name_b=_name(league, b), five_a=fives[0], five_b=fives[1],
         a=sides[0], b=sides[1],
-        note="Each team's five is the players with the most games started for that team this season "
+        note="Each team's five is the players with the most games started for that team in its season "
              "(ties broken by minutes). It is not a confirmed lineup. Traded players count only for "
-             "their games with that team.")
+             "their games with that team. When two different seasons are compared, each side uses its own "
+             "season, so differences in era (pace, three-point volume) are part of what you see.")

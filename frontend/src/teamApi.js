@@ -15,7 +15,8 @@ export function listTeams(league, year, signal) {
   return getJSON(`${BASE_URL}/teams?${q}`, signal)
 }
 
-export function compareTeams({ league, year, a, b }, signal) {
+export function compareTeams({ league, year, yearB, a, b }, signal) {
   const q = new URLSearchParams({ league, year, a, b })
+  if (yearB != null) q.set('year_b', yearB)
   return getJSON(`${BASE_URL}/compare-teams?${q}`, signal)
 }
