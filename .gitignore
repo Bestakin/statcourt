@@ -85,3 +85,12 @@ awards_report.txt
 *.bak_before_*
 
 patch_season_labels.py
+
+diagnose_traded.py
+traded_cache.json
+traded_report.txt
+traded_rows.csv
+
+fix_cache.json
+fix_traded_report.txt
+migrate_fix_traded.py
