@@ -16,7 +16,15 @@ app = FastAPI(title="StatCourt API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+      allow_origins=[
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "https://statcourt-1.onrender.com",
+      "https://statcourt-site.onrender.com",
+      "https://getstatcourt.com",
+      "https://www.getstatcourt.com",
+  ],
     allow_origin_regex=r"http://(192\.168|10\.0)\.\d+\.\d+:\d+|https://.*\.onrender\.com",
     allow_methods=["*"],
     allow_headers=["*"],
