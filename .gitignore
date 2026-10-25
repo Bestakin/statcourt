@@ -94,3 +94,12 @@ traded_rows.csv
 fix_cache.json
 fix_traded_report.txt
 migrate_fix_traded.py
+
+patch_groups_team.py
+
+patch_groups_team.py
+
+patch_team_ui.py
+*.bak_before_team
+
+patch_logo_basketball.py

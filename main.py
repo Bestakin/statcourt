@@ -696,3 +696,6 @@ app.include_router(groups_router)
 
 from awards import router as awards_router
 app.include_router(awards_router)
+
+from teams import router as teams_router
+app.include_router(teams_router)

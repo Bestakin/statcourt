@@ -12,6 +12,8 @@ import DraftClassExplorer from './components/DraftClassExplorer'
 import SeasonFinder from './components/SeasonFinder'
 import GroupCompare from './components/GroupCompare'
 import AwardsPage from './components/AwardsPage'
+import TeamCompare from './components/TeamCompare'
+import Logo from './components/Logo'
 import AwardBadges from './components/AwardBadges'
 import RecentSearches from './components/RecentSearches'
 import { comparePlayers, getPlayer, getCareerAverages } from './api'
@@ -198,6 +200,7 @@ export default function App() {
   const [showSeasonFinder, setShowSeasonFinder] = useState(false)
   const [showGroups, setShowGroups] = useState(false)
   const [showAwards, setShowAwards] = useState(false)
+  const [showTeams, setShowTeams] = useState(false)
   const [showCareerInfo, setShowCareerInfo] = useState(false)
   const [finderInitialFilters, setFinderInitialFilters] = useState(null)
 
@@ -251,7 +254,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-court-bg px-6 py-10 md:py-16">
       <header className="max-w-3xl mx-auto text-center mb-12">
-        <p className="text-xs uppercase tracking-[0.3em] text-ball font-body mb-3">StatCourt</p>
+        <div className="flex justify-center mb-4">
+          <Logo variant="basketball" size={48} />
+        </div>
         <h1 className="font-display text-4xl md:text-5xl text-ink-primary font-semibold">Head to Head</h1>
         <p className="text-ink-muted font-body mt-3">
           Line up any two {league} players, any season since they entered the league.
@@ -281,16 +286,22 @@ export default function App() {
           🔍 {showSeasonFinder ? 'Hide Season Finder' : 'Explore seasons instead → Season Finder'}
         </button>
         <button
-          onClick={() => { setShowGroups(!showGroups); setShowAwards(false) }}
+          onClick={() => { setShowGroups(!showGroups); setShowAwards(false); setShowTeams(false) }}
           className="mt-2 block mx-auto text-xs text-ball hover:text-ink-primary transition-colors font-body underline underline-offset-2"
         >
           👥 {showGroups ? '← Back to Head to Head' : 'Compare groups of players → Group Comparison'}
         </button>
         <button
-          onClick={() => { setShowAwards(!showAwards); setShowGroups(false) }}
+          onClick={() => { setShowAwards(!showAwards); setShowGroups(false); setShowTeams(false) }}
           className="mt-2 block mx-auto text-xs text-ball hover:text-ink-primary transition-colors font-body underline underline-offset-2"
         >
           🏅 {showAwards ? '← Back to Head to Head' : 'Year-by-year winners → Awards'}
+        </button>
+        <button
+          onClick={() => { setShowTeams(!showTeams); setShowGroups(false); setShowAwards(false) }}
+          className="mt-2 block mx-auto text-xs text-ball hover:text-ink-primary transition-colors font-body underline underline-offset-2"
+        >
+          🏀 {showTeams ? '← Back to Head to Head' : 'Compare two teams → Team Comparison'}
         </button>
       </header>
 
@@ -307,6 +318,12 @@ export default function App() {
         </div>
       )}
 
+      {showTeams && (
+        <div className="max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 mb-6">
+          <TeamCompare league={league} onClose={() => setShowTeams(false)} />
+        </div>
+      )}
+
       {showSeasonFinder && (
         <div className="max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 mb-6">
           <SeasonFinder
@@ -319,7 +336,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={`max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 ${showGroups || showAwards ? 'hidden' : ''}`}>
+      <main className={`max-w-3xl mx-auto bg-court-surface border border-court-line rounded-xl p-6 md:p-10 ${showGroups || showAwards || showTeams ? 'hidden' : ''}`}>
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 mb-8">
           <PlayerSearch
             label="Player 1" selectedPlayer={player1} onSelect={setPlayer1} align="left"

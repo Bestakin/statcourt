@@ -103,7 +103,7 @@ def _r1(x):
     return round(x, 1) if x is not None else None
 
 
-def _side(conn, ids, mode, year):
+def _side(conn, ids, mode, year, team=None):
     leagues, lines, excluded = set(), [], []
     S = {k: 0.0 for k in STATS}                        # exact totals
     C = {k: 0.0 for k in STATS}                        # sum of per-game averages
@@ -116,15 +116,22 @@ def _side(conn, ids, mode, year):
         if p is None:
             raise HTTPException(404, f"Player {pid} not found")
         leagues.add(p["league"])
-        q = "SELECT * FROM player_season_stats WHERE player_id=? AND games_played>0 AND t_fga IS NOT NULL"
+        table = "player_season_stints" if team else "player_season_stats"
+        q = f"SELECT * FROM {table} WHERE player_id=? AND games_played>0 AND t_fga IS NOT NULL"
         args = [pid]
+        if team:
+            q += " AND team_abbreviation=?"
+            args.append(team)
         if mode == "season":
             q += " AND season_year=?"
             args.append(year)
         rows = conn.execute(q, args).fetchall()
         if not rows:
-            q2 = "SELECT COUNT(*) FROM player_season_stats WHERE player_id=? AND games_played>0"
+            q2 = f"SELECT COUNT(*) FROM {table} WHERE player_id=? AND games_played>0"
             a2 = [pid]
+            if team:
+                q2 += " AND team_abbreviation=?"
+                a2.append(team)
             if mode == "season":
                 q2 += " AND season_year=?"
                 a2.append(year)

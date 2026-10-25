@@ -69,7 +69,7 @@ const VIEWS = [
     help: 'Exact totals added together across everyone in the group.' },
 ]
 
-export function GroupResults({ data, nameA = 'Group A', nameB = 'Group B' }) {
+export function GroupResults({ data, nameA = 'Group A', nameB = 'Group B', hidePlayers = false }) {
   const A = data.a.totals
   const B = data.b.totals
   // Combined and Totals add players up, so they favour the bigger group; Avg per player and the
@@ -84,6 +84,7 @@ export function GroupResults({ data, nameA = 'Group A', nameB = 'Group B' }) {
 
   return (
     <div>
+      {!hidePlayers && (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
         <div>
           <div className="text-xs uppercase tracking-widest text-ball font-body mb-2">{nameA}</div>
@@ -94,6 +95,7 @@ export function GroupResults({ data, nameA = 'Group A', nameB = 'Group B' }) {
           <PlayerCards side={data.b} align="right" />
         </div>
       </div>
+      )}
 
       {sizesDiffer && (
         <p className="text-xs text-ink-primary/80 font-body bg-court-surface2 rounded-md px-3 py-2 mb-4">
