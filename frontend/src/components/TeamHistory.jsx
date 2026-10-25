@@ -47,7 +47,7 @@ export default function TeamHistory({ player }) {
   if (!history) return null
   const stints = computeStints(history)
   if (stints.length === 0) return null
-  const playerStillActive = player.last_active_year >= CURRENT_YEAR
+  const playerStillActive = player.last_active_year >= (player.league === 'NBA' ? 2027 : CURRENT_YEAR)
 
   return (
     <div>

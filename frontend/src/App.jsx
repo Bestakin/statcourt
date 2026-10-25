@@ -25,7 +25,7 @@ import { seasonLabel } from './seasonLabel'
 // those under a different league identifier, so 1950 is the real floor.
 const LEAGUE_RANGES = {
   WNBA: { earliest: 1997, current: 2026 },
-  NBA: { earliest: 1950, current: 2026 },
+  NBA: { earliest: 1950, current: 2027 },
 }
 
 function SidePanel({ playerId, side, highlights, seasonYear, align, onJumpToSeason, mode, league }) {

@@ -3,7 +3,7 @@ import Avatar from './Avatar'
 import { seasonLabel } from '../seasonLabel'
 import { searchPlayersForGroup, compareGroups } from '../groupApi'
 
-const RANGES = { WNBA: { earliest: 1997, current: 2026 }, NBA: { earliest: 1950, current: 2026 } }
+const RANGES = { WNBA: { earliest: 1997, current: 2026 }, NBA: { earliest: 1950, current: 2027 } }
 const MAX = 5
 
 const pct = (v) => (v == null ? '—' : `${(v * 100).toFixed(1)}%`)

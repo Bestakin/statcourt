@@ -4,7 +4,7 @@ import { GroupResults } from './GroupCompare'
 import { listTeams, compareTeams } from '../teamApi'
 
 // NBA starts-data is only reliable from 1981-82 on (season_year 1982); WNBA from its first season.
-const RANGES = { WNBA: { earliest: 1997, current: 2026 }, NBA: { earliest: 1982, current: 2026 } }
+const RANGES = { WNBA: { earliest: 1997, current: 2026 }, NBA: { earliest: 1982, current: 2027 } }
 const label = (league, y) => (league === 'NBA' ? `${y - 1}-${String(y).slice(-2)}` : String(y))
 const n1 = (v) => (v == null ? '—' : v.toFixed(1))
 
