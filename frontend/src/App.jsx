@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import PlayerSearch from './components/PlayerSearch'
 import StatBar from './components/StatBar'
 import CompositePanel from './components/CompositePanel'
+import CustomCompare from './components/CustomCompare'
 import AdvancedRadar from './components/AdvancedRadar'
 import HighlightBadges from './components/HighlightBadges'
 import EmptyStateCard from './components/EmptyStateCard'
@@ -475,6 +476,19 @@ export default function App() {
                 </button>
               </div>
             )}
+
+            <CustomCompare
+              mode={mode}
+              id1={player1.id}
+              id2={player2.id}
+              name1={player1.name}
+              name2={player2.name}
+              season1={s1}
+              season2={s2}
+              career1={career1}
+              career2={career2}
+              seasonAvailable={!!bothActive}
+            />
 
             <div key={`similar-${player1.id}-${player2.id}`} className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-fade-in">
               <SimilarPlayers playerId={player1.id} playerName={player1.name} onSelectPlayer={setPlayer1} />

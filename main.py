@@ -1,4 +1,4 @@
-﻿"""
+"""
 main.py — StatCourt API (multi-league: WNBA + NBA)
 
 Reads only from local SQLite (wnba.db). Never calls basketball-reference
@@ -698,4 +698,6 @@ from awards import router as awards_router
 app.include_router(awards_router)
 
 from teams import router as teams_router
+from career_extra import router as career_extra_router
 app.include_router(teams_router)
+app.include_router(career_extra_router)
