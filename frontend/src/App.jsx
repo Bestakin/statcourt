@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import PlayerSearch from './components/PlayerSearch'
 import StatBar from './components/StatBar'
 import CompositePanel from './components/CompositePanel'
+import SeasonInProgressNote from './components/SeasonInProgressNote'
 import CustomCompare from './components/CustomCompare'
 import AdvancedRadar from './components/AdvancedRadar'
 import HighlightBadges from './components/HighlightBadges'
@@ -441,6 +442,7 @@ export default function App() {
               </div>
             ) : bothActive ? (
               <div>
+                <SeasonInProgressNote league={league} seasonYear={seasonYear} />
                 <div className="mt-4">
                   {seasonStatRows.map((row) => (
                     <StatBar

@@ -21,6 +21,26 @@ const METRICS = [
   { id: 'gp', label: 'Games played', short: 'GP', season: 'games_played', career: 'games_played', kind: 'int' },
 ]
 const MAX_PICKS = 5
+const DEFAULT_PICKS = ['pts', 'reb', 'ast']
+
+// Picked stats live in the address (?stats=pts,reb,ast) so a shared or saved link reopens with them.
+// "none" means the user cleared everything on purpose. Only the stats key is touched.
+function readPicked() {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('stats')
+    if (!raw) return DEFAULT_PICKS
+    if (raw === 'none') return []
+    const ids = [...new Set(raw.split(',').filter((id) => METRICS.some((m) => m.id === id)))].slice(0, MAX_PICKS)
+    return ids.length ? ids : DEFAULT_PICKS
+  } catch { return DEFAULT_PICKS }
+}
+function writePicked(ids) {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    params.set('stats', ids.length ? ids.join(',') : 'none')
+    window.history.replaceState(window.history.state, '', window.location.pathname + '?' + params.toString().replace(/%2C/g, ','))
+  } catch { /* the address bar is a convenience; picking still works without it */ }
+}
 
 // Percentages arrive either as fractions (0.512) or already as percents (51.2); show both as 51.2.
 const toShown = (kind, v) => {
@@ -34,7 +54,7 @@ const fmt = (kind, shown) => (shown == null ? null : kind === 'int' ? String(sho
 
 // Career TOV / MIN come from /career-extra (games-weighted, with coverage). Everything else is already on the page.
 export default function CustomCompare({ mode, id1, id2, name1, name2, season1, season2, career1, career2, seasonAvailable }) {
-  const [picked, setPicked] = useState(['pts', 'reb', 'ast'])
+  const [picked, setPicked] = useState(readPicked)
   const [open, setOpen] = useState(false)
   const [extra, setExtra] = useState({ key: '', a: null, b: null, failed: false })
   const extraKey = `${id1}-${id2}`
@@ -53,8 +73,11 @@ export default function CustomCompare({ mode, id1, id2, name1, name2, season1, s
   const src2 = mode === 'career' ? career2 : season2
   const usable = mode === 'career' ? !!(career1 && career2) : seasonAvailable && !!(season1 && season2)
 
-  const toggle = (id) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_PICKS ? p : [...p, id]))
+  const toggle = (id) => {
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : picked.length >= MAX_PICKS ? picked : [...picked, id]
+    setPicked(next)
+    writePicked(next)
+  }
 
   const rows = picked.map((id) => {
     const m = METRICS.find((x) => x.id === id)
